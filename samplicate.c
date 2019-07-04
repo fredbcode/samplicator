@@ -218,7 +218,7 @@ init_samplicator (ctx)
   /* check is there actually at least one configured data receiver */
   for (i = 0, sctx = ctx->sources; sctx != NULL; sctx = sctx->next)
     {
-      i += sctx->nreceivers; 
+      i += sctx->nreceivers;
     }
   if (i == 0)
     {
@@ -325,6 +325,12 @@ samplicate (ctx)
   socklen_t addrlen;
   char host[INET6_ADDRSTRLEN];
   char serv[6];
+  char buffer[10];
+  int port;
+  char *adrIPp;
+  char src[10];
+  char ipstr[INET6_ADDRSTRLEN];
+  socklen_t len;
 
   while (1)
     {
@@ -350,21 +356,65 @@ samplicate (ctx)
 	  fprintf (stderr, "recvfrom(): %s\n", strerror(errno));
 	  exit (1);
 	}
-      if (n > ctx->pdulen)
+
+    if (ctx->debug){
+            int rc = getnameinfo((struct sockaddr *)&remote_address, addrlen, host, INET6_ADDRSTRLEN,
+			   serv, 6,NI_NUMERICHOST | NI_NUMERICSERV);
+        if (rc == 0) printf("New connection from %s \n", host);
+
+    }
+
+    len = sizeof remote_address;
+    getpeername(ctx->fsockfd,(struct sockaddr*)&remote_address, &len);
+
+    struct sockaddr_in *s = (struct sockaddr_in *)&remote_address;
+
+// deal with both IPv4 and IPv6:
+    if (remote_address.ss_family == AF_INET) {
+        port = ntohs(s->sin_port);
+        inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
+
+        adrIPp =(char *)inet_ntoa(s->sin_addr);
+        if (ctx->debug)
+            printf("IP address: %x, is %s %x \n", htonl(s->sin_addr.s_addr), adrIPp, s->sin_addr.s_addr);
+    } else { // AF_INET6
+        struct sockaddr_in6 *s = (struct sockaddr_in6 *)&remote_address;
+        port = ntohs(s->sin6_port);
+        inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
+    }
+
+    int sizearray = sizeof s->sin_addr.s_addr;
+    sprintf(buffer, "%x", s->sin_addr.s_addr);
+
+    strcpy(src,buffer);
+
+    if (ctx->debug)
+        fprintf (stderr, "Inject source ID: %s size %ld %d \n", src , strlen(src), sizearray);
+
+
+    memcpy(fpdu+15, src, sizearray);
+
+    if (ctx->debug)
+        fprintf (stderr, "\n\n MENCOPY ! %s \n\n", src);
+
+    if (ctx->debug)
+        printf("Fred received size: %ld data %s\n", sizeof (fpdu), host );
+
+    if (n > ctx->pdulen)
 	{
 	  fprintf (stderr, "Warning: %ld excess bytes discarded\n",
 		   n-ctx->pdulen);
 	  n = ctx->pdulen;
 	}
-      if (addrlen != ctx->fsockaddrlen)
+    if (addrlen != ctx->fsockaddrlen)
 	{
 	  fprintf (stderr, "recvfrom() return address length %lu - expected %lu\n",
 		   (unsigned long) addrlen, (unsigned long) ctx->fsockaddrlen);
 	  exit (1);
 	}
-      if (ctx->debug)
+    if (ctx->debug)
 	{
-	  if (getnameinfo ((struct sockaddr *) &remote_address, addrlen,
+    if (getnameinfo ((struct sockaddr *) &remote_address, addrlen,
 			   host, INET6_ADDRSTRLEN,
 			   serv, 6,
 			   NI_NUMERICHOST|NI_NUMERICSERV) == -1)
@@ -375,8 +425,10 @@ samplicate (ctx)
 	  fprintf (stderr, "received %d bytes from %s:%s\n", n, host, serv);
 	}
 
-      for (sctx = ctx->sources; sctx != NULL; sctx = sctx->next)
+    for (sctx = ctx->sources; sctx != NULL; sctx = sctx->next)
 	{
+
+//	fprintf (stderr, "received %d bytes from %s:%s\n", n, remote_address.sin_addr.s_addr , serv)
 	  if (match_addr_p ((struct sockaddr *) &remote_address,
 			    (struct sockaddr *) &sctx->source,
 			    (struct sockaddr *) &sctx->mask))
@@ -424,7 +476,7 @@ samplicate (ctx)
 				  strcpy (host, "???");
 				  strcpy (serv, "?????");
 				}
-			      fprintf (stderr, "  sent to %s:%s\n", host, serv); 
+			      fprintf (stderr, "  sent to %s:%s\n", host, serv);
 			    }
 			}
 		      receiver->freqcount = receiver->freq-1;
