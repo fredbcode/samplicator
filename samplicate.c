@@ -328,7 +328,10 @@ samplicate (ctx)
   char buffer[10];
   int port;
   char *adrIPp;
-  char src[10];
+  char src[10] = {0};
+  int s_source_id[10] = {1,1,1,1,1};
+  // Reference source_id 0 = 00001
+  int b_source_id[10] = {0,0,0,0,1};
   char ipstr[INET6_ADDRSTRLEN];
   socklen_t len;
 
@@ -388,17 +391,36 @@ samplicate (ctx)
 
     strcpy(src,buffer);
 
-    if (ctx->debug)
-        fprintf (stderr, "Inject source ID: %s size %ld %d \n", src , strlen(src), sizearray);
+    int lock = 0;
+    int a = 0;
+
+    for (int i = 16; i < 21; i++){
+        s_source_id[a] = fpdu[i];
+        if (ctx->debug)
+            fprintf (stderr, "Copy source_id memory value source data %d \n" ,fpdu[i]);
+	a++;
+    }
 
 
-    memcpy(fpdu+15, src, sizearray);
+    for (int i = 0; i < 5; i++){
+       	if (ctx->debug)
+           	fprintf (stderr, "Compare source number ID: %d s_source %d b_source %d\n", i, s_source_id[i], b_source_id[i]);
+	// when a template is sending value number 5 can be 0 not 1
+    	if(s_source_id[i] != b_source_id[i] && !(i == 4 && s_source_id[i] == 0)){
+        	if (ctx->debug)
+             		fprintf (stderr, "Can't Inject source ID: %d s_source %d b_source %d netflow v9 ?\n", i, s_source_id[i], b_source_id[i]);
+		lock = 1;
+	} else if (i == 4 && s_source_id[i] == 0){
+        	if (ctx->debug)
+             	fprintf (stderr, "Template is sending by router\n");
+	}
+    }
 
-    if (ctx->debug)
-        fprintf (stderr, "\n\n MENCOPY ! %s \n\n", src);
-
-    if (ctx->debug)
-        printf("Fred received size: %ld data %s\n", sizeof (fpdu), host );
+    if (!lock){
+        if (ctx->debug)
+            fprintf (stderr, "Inject source ID: %s size %ld %d \n", src , strlen(src), sizearray );
+        memcpy(fpdu+15, src, sizearray);
+    } 
 
     if (n > ctx->pdulen)
 	{
@@ -412,23 +434,21 @@ samplicate (ctx)
 		   (unsigned long) addrlen, (unsigned long) ctx->fsockaddrlen);
 	  exit (1);
 	}
-    if (ctx->debug)
-	{
-    if (getnameinfo ((struct sockaddr *) &remote_address, addrlen,
-			   host, INET6_ADDRSTRLEN,
-			   serv, 6,
-			   NI_NUMERICHOST|NI_NUMERICSERV) == -1)
-	    {
-	      strcpy (host, "???");
-	      strcpy (serv, "?????");
-	    }
-	  fprintf (stderr, "received %d bytes from %s:%s\n", n, host, serv);
-	}
+    if (ctx->debug){
+        if (getnameinfo ((struct sockaddr *) &remote_address, addrlen,
+                   host, INET6_ADDRSTRLEN,
+                   serv, 6,
+                   NI_NUMERICHOST|NI_NUMERICSERV) == -1)
+            {
+              strcpy (host, "???");
+              strcpy (serv, "?????");
+            }
+          fprintf (stderr, "received %d bytes from %s:%s\n", n, host, serv);
+        }
 
     for (sctx = ctx->sources; sctx != NULL; sctx = sctx->next)
 	{
 
-//	fprintf (stderr, "received %d bytes from %s:%s\n", n, remote_address.sin_addr.s_addr , serv)
 	  if (match_addr_p ((struct sockaddr *) &remote_address,
 			    (struct sockaddr *) &sctx->source,
 			    (struct sockaddr *) &sctx->mask))
