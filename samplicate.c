@@ -218,7 +218,7 @@ init_samplicator (ctx)
   /* check is there actually at least one configured data receiver */
   for (i = 0, sctx = ctx->sources; sctx != NULL; sctx = sctx->next)
     {
-      i += sctx->nreceivers; 
+      i += sctx->nreceivers;
     }
   if (i == 0)
     {
@@ -325,7 +325,18 @@ samplicate (ctx)
   socklen_t addrlen;
   char host[INET6_ADDRSTRLEN];
   char serv[6];
-
+  char buffer[10];
+  int port;
+  char *adrIPp;
+  char src[10] = {0};
+  int s_source_id[4] = {1,1,1,1};
+  // Reference source_id 0 = 00001
+  // CISCO Ref
+  int c_source_id[4] = {0,0,0,0};
+  // oneaccess
+  int o_source_id[4] = {0,0,0,1};
+  char ipstr[INET6_ADDRSTRLEN];
+  socklen_t len;
   while (1)
     {
       if (ctx->timeout)
@@ -350,33 +361,104 @@ samplicate (ctx)
 	  fprintf (stderr, "recvfrom(): %s\n", strerror(errno));
 	  exit (1);
 	}
-      if (n > ctx->pdulen)
+
+    if (ctx->debug){
+            int rc = getnameinfo((struct sockaddr *)&remote_address, addrlen, host, INET6_ADDRSTRLEN,
+			   serv, 6,NI_NUMERICHOST | NI_NUMERICSERV);
+        if (rc == 0) printf("New connection from %s \n", host);
+
+    }
+
+    len = sizeof remote_address;
+    getpeername(ctx->fsockfd,(struct sockaddr*)&remote_address, &len);
+
+    struct sockaddr_in *s = (struct sockaddr_in *)&remote_address;
+
+// deal with both IPv4 and IPv6:
+    if (remote_address.ss_family == AF_INET) {
+        port = ntohs(s->sin_port);
+        inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
+
+        adrIPp =(char *)inet_ntoa(s->sin_addr);
+        if (ctx->debug)
+            printf("IP address: %x, is %s %x \n", htonl(s->sin_addr.s_addr), adrIPp, s->sin_addr.s_addr);
+    } else { // AF_INET6
+        struct sockaddr_in6 *s = (struct sockaddr_in6 *)&remote_address;
+        port = ntohs(s->sin6_port);
+        inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
+    }
+
+    int sizearray = sizeof s->sin_addr.s_addr; 
+    sprintf(buffer, "%x", s->sin_addr.s_addr);
+
+    strcpy(src,buffer);
+
+    int lock = 0;
+    int a = 0;
+
+    // Take the source_id in memory
+    //
+    for (int i = 16; i < 19; i++){
+        s_source_id[a] = fpdu[i];
+        if (ctx->debug)
+            fprintf (stderr, "Copy source_id memory value source data %d \n" ,fpdu[i]);
+	a++;
+    }
+
+
+    for (int i = 0; i <= 3; i++){
+       	if (ctx->debug)
+           	fprintf (stderr, "Compare source number ID: %d s_source %d c_source %d or o_source %d \n", i, s_source_id[i], c_source_id[i], o_source_id[i]);
+	// when a template is sending value number 5 can be 0 not 1
+	// Source_id is only injected when we are sure that memory value is not unknow 
+
+	if((s_source_id[i] != c_source_id[i]) && (s_source_id[i] != o_source_id[i])){
+        	if (ctx->debug)
+             		fprintf (stderr, "Can't Inject source ID: %d s_source %d b_source %d not netflow v9 or source_id already used ? \n", i, s_source_id[i], c_source_id[i]);
+		lock = 1;
+		break;
+	} 
+	
+        if (ctx->debug && i == 3 && !lock){
+		if (s_source_id[i] == 1){
+             		fprintf (stderr, "Empty source ID is sending by template or oneaccess : Injection\n");
+		}
+		if (s_source_id[i] == 0){
+             		fprintf (stderr, "Empty source ID is sending by cisco: Injection\n");
+		}
+    	}
+    }
+
+    if (!lock)
+        memcpy(fpdu+15, src, sizearray);
+
+    if (n > ctx->pdulen)
 	{
 	  fprintf (stderr, "Warning: %ld excess bytes discarded\n",
 		   n-ctx->pdulen);
 	  n = ctx->pdulen;
 	}
-      if (addrlen != ctx->fsockaddrlen)
+    if (addrlen != ctx->fsockaddrlen)
 	{
 	  fprintf (stderr, "recvfrom() return address length %lu - expected %lu\n",
 		   (unsigned long) addrlen, (unsigned long) ctx->fsockaddrlen);
 	  exit (1);
 	}
-      if (ctx->debug)
-	{
-	  if (getnameinfo ((struct sockaddr *) &remote_address, addrlen,
-			   host, INET6_ADDRSTRLEN,
-			   serv, 6,
-			   NI_NUMERICHOST|NI_NUMERICSERV) == -1)
-	    {
-	      strcpy (host, "???");
-	      strcpy (serv, "?????");
-	    }
-	  fprintf (stderr, "received %d bytes from %s:%s\n", n, host, serv);
-	}
+    if (ctx->debug){
+        if (getnameinfo ((struct sockaddr *) &remote_address, addrlen,
+                   host, INET6_ADDRSTRLEN,
+                   serv, 6,
+                   NI_NUMERICHOST|NI_NUMERICSERV) == -1)
+            {
+              strcpy (host, "???");
+              strcpy (serv, "?????");
+            }
+          fprintf (stderr, "received %d bytes from %s:%s\n", n, host, serv);
+        }
 
-      for (sctx = ctx->sources; sctx != NULL; sctx = sctx->next)
+    for (sctx = ctx->sources; sctx != NULL; sctx = sctx->next)
 	{
+
 	  if (match_addr_p ((struct sockaddr *) &remote_address,
 			    (struct sockaddr *) &sctx->source,
 			    (struct sockaddr *) &sctx->mask))
@@ -424,7 +506,7 @@ samplicate (ctx)
 				  strcpy (host, "???");
 				  strcpy (serv, "?????");
 				}
-			      fprintf (stderr, "  sent to %s:%s\n", host, serv); 
+			      fprintf (stderr, "  sent to %s:%s\n", host, serv);
 			    }
 			}
 		      receiver->freqcount = receiver->freq-1;
@@ -480,6 +562,16 @@ send_pdu_to_receiver (receiver, fpdu, length, source_addr)
 	= ((receiver->flags & pf_CHECKSUM) ? RAWSEND_COMPUTE_UDP_CHECKSUM : 0);
       return raw_send_from_to (receiver->fd, fpdu, length,
 			       (struct sockaddr *) source_addr,
+			       (struct sockaddr *) &receiver->addr,
+			       receiver->ttl, rawsend_flags);
+    }
+  else if(receiver->flags & pf_SPOOF_WITH_IP)
+    {
+
+      int rawsend_flags
+	= ((receiver->flags & pf_CHECKSUM) ? RAWSEND_COMPUTE_UDP_CHECKSUM : 0);
+      return raw_send_from_to (receiver->fd, fpdu, length,
+			       (struct sockaddr *) &receiver->spoofed_src_addr,
 			       (struct sockaddr *) &receiver->addr,
 			       receiver->ttl, rawsend_flags);
     }
@@ -539,7 +631,7 @@ make_send_sockets (struct samplicator_context *ctx)
 	  struct receiver *receiver = &sctx->receivers[i];
 	  int af = receiver->addr.ss_family;
 	  int af_index = af == AF_INET ? 0 : 1;
-	  int spoof_p = receiver->flags & pf_SPOOF;
+	  int spoof_p = receiver->flags & pf_SPOOF || receiver->flags & pf_SPOOF_WITH_IP;
 
 	  if (socks[spoof_p][af_index] == -1)
 	    {
