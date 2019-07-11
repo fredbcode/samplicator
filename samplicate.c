@@ -398,7 +398,7 @@ samplicate (ctx)
 
     // Take the source_id in memory
     //
-    for (int i = 16; i < 19; i++){
+    for (int i = 16; i <= 19; i++){
         s_source_id[a] = fpdu[i];
         if (ctx->debug)
             fprintf (stderr, "Copy source_id memory value source data %d \n" ,fpdu[i]);
