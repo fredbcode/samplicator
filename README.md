@@ -1,4 +1,6 @@
-THIS VERSION IS ONLY FOR NETFLOW V9 AN ID TAG (IP SOURCE BASED) IS AUTOMATICALLY ADDED BEFORE SENDING TO DESTINATION
+THIS VERSION IS ONLY FOR NETFLOW V9, ID TAG (IP SOURCE BASED) IS AUTOMATICALLY ADDED BEFORE SENDING TO DESTINATION
+
+New option -l for load balance destinations (round robin or random)
 
 UDP Samplicator
 ===============
@@ -12,7 +14,7 @@ DOWNLOADING
 -----------
 
 This package is distributed under
-	https://github.com/sleinen/samplicator/
+	https://github.com/fredbcode/samplicator/
 
 INSTALLATION
 ------------
@@ -34,6 +36,7 @@ The usage convention for the program is
 Where each `<option>` can be one of
 
 	-d <level>	to set the debugging level
+        -l <1 - 2>	load balance requests (1 Random - more cpu usage - 2 round robin, config file only)
 	-s <address>	to set interface address on which to listen
 			for incoming packets (default any)
 	-p <port>	to set the UDP port on which to listen for

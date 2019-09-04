@@ -73,7 +73,7 @@ parse_error (const struct samplicator_context *ctx, const char *fmt, ...)
   va_end (fmt_args);
   return -1;
 }
-  
+
 
 /* copy_string_start_end (start, end)
 
@@ -138,12 +138,12 @@ read_cf_file (file, ctx)
 	{
 	  break;
 	}
-	
+
       ++ctx->config_file_lineno;
       if (parse_line (ctx, tmp_s, tmp_s + strlen (tmp_s)) == -1)
-	{
-	  return -1;
-	}
+        {
+          return -1;
+        }
     }
   fclose (cf);
   return 0;
@@ -468,13 +468,14 @@ parse_line (ctx, start, end)
 	  if (c < end)
 	    c++;
 	}
-      if (argc > 0) 
-	{
-	  if (parse_receivers (argc, argv, ctx, sctx) == -1)
-	    {
-	      return -1;
-	    }
-	}
+
+    if (argc > 0)
+      {
+        if (parse_receivers (argc, argv, ctx, sctx) == -1)
+          {
+            return -1;
+          }
+      }
     }
   else
     {
@@ -493,7 +494,7 @@ parse_receiver (struct receiver *receiverp,
   char portspec[NI_MAXSERV];
   struct addrinfo hints, *res;
   int result;
-  
+
   receiverp->flags = ctx->default_receiver_flags;
 
   if(receiverp->flags & pf_SPOOF_WITH_IP) {
@@ -504,20 +505,19 @@ parse_receiver (struct receiver *receiverp,
 
       if (result != 0)
         {
-  	return parse_error (ctx, "Parsing IP address (%s) failed", ctx->spoofed_src_addr);
+            return parse_error (ctx, "Parsing IP address (%s) failed", ctx->spoofed_src_addr);
         }
-        
       memcpy (&(receiverp->spoofed_src_addr), res->ai_addr, res->ai_addrlen);
       receiverp->spoofed_src_addrlen = res->ai_addrlen;
       freeaddrinfo(res);
     }
-    
-      
+
+
   }
-    
+
   receiverp->freqcount = 0;
   receiverp->freq = 1;
-  receiverp->ttl = DEFAULT_TTL; 
+  receiverp->ttl = DEFAULT_TTL;
 
   start = arg; end = start + strlen (arg);
   while (start < end && isspace (*start))
@@ -737,6 +737,7 @@ parse_receivers (argc, argv, ctx, sctx)
 	{
 	  return -1;
 	}
+      ctx->receivermax++;
     }
   if (ctx->sources == NULL)
     {
@@ -747,7 +748,7 @@ parse_receivers (argc, argv, ctx, sctx)
       struct source_context *ptr;
       for (ptr = ctx->sources; ptr->next != NULL; ptr = ptr->next);
       ptr->next = sctx;
-    } 
+    }
   return 0;
 }
 
@@ -781,6 +782,7 @@ parse_args (argc, argv, ctx)
   bzero (&ctx->faddr, sizeof ctx->faddr);
   ctx->fport_spec = FLOWPORT;
   ctx->debug = 0;
+  ctx->receivermax = 0;
   ctx->timeout = 0;
   ctx->ipv4_only = 0;
   ctx->ipv6_only = 0;
@@ -788,9 +790,9 @@ parse_args (argc, argv, ctx)
   ctx->pid_file = (const char *) 0;
   ctx->sources = 0;
   ctx->default_receiver_flags = pf_CHECKSUM;
-  
+  ctx->loadb = 0;
   ctx->spoofed_src_addr = NULL;
-  
+
   /* assume that command-line supplied receivers want to get all data */
   sctx->source.ss_family = AF_INET;
   ((struct sockaddr_in *) &sctx->source)->sin_addr.s_addr = 0;
@@ -799,7 +801,7 @@ parse_args (argc, argv, ctx)
   sctx->tx_delay = 0;
 
   optind = 1;
-  while ((i = getopt (argc, (char **) argv, "P:hu:b:d:t:m:p:s:x:c:fSn46")) != -1)
+  while ((i = getopt (argc, (char **) argv, "P:hu:b:d:t:m:p:s:x:c:l:fSn46")) != -1)
     {
       switch (i)
 	{
@@ -823,6 +825,9 @@ parse_args (argc, argv, ctx)
 	  break;
 	case 'm': /* make PID file */
 	  ctx->pid_file = optarg;
+	  break;
+    case 'l': /* loadbalance */
+	  ctx->loadb = atoi (optarg);
 	  break;
 	case 's': /* flow address */
 	  ctx->faddr_spec = optarg;
@@ -892,6 +897,7 @@ Supported options:\n\
   -p <port>                UDP port to accept flows on (default %s)\n\
   -s <address>             Interface address to accept flows on (default any)\n\
   -d <level>               debug level\n\
+  -l <1 - 2>	    	   load balance requests (1 Random - more cpu usage - 2 round robin, config file only)\n\
   -t <timeout_ms>          Exit with RC 5 if no data is received for this\n\
                            amount of milliseconds\n\
   -b <size>                set socket buffer size (default %lu)\n\

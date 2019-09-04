@@ -37,6 +37,7 @@
 #include "read_config.h"
 #include "rawsend.h"
 #include "inet.h"
+#include <time.h>
 
 static int send_pdu_to_receiver (struct receiver *, const void *, size_t,
 				 struct sockaddr *);
@@ -337,6 +338,7 @@ samplicate (ctx)
   int o_source_id[4] = {0,0,0,1};
   char ipstr[INET6_ADDRSTRLEN];
   socklen_t len;
+  int inc = 0;
   while (1)
     {
       if (ctx->timeout)
@@ -388,21 +390,24 @@ samplicate (ctx)
         inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
     }
 
-    int sizearray = sizeof s->sin_addr.s_addr; 
+    int sizearray = sizeof s->sin_addr.s_addr;
     sprintf(buffer, "%x", s->sin_addr.s_addr);
 
     strcpy(src,buffer);
 
     int lock = 0;
     int a = 0;
-
+    int randomlb = 0;
+    int maxre;
+    int intermediate = 0;
+    int loopcount = 0;
     // Take the source_id in memory
     //
     for (int i = 16; i <= 19; i++){
         s_source_id[a] = fpdu[i];
         if (ctx->debug)
             fprintf (stderr, "Copy source_id memory value source data %d \n" ,fpdu[i]);
-	a++;
+        a++;
     }
 
 
@@ -410,15 +415,15 @@ samplicate (ctx)
        	if (ctx->debug)
            	fprintf (stderr, "Compare source number ID: %d s_source %d c_source %d or o_source %d \n", i, s_source_id[i], c_source_id[i], o_source_id[i]);
 	// when a template is sending value number 5 can be 0 not 1
-	// Source_id is only injected when we are sure that memory value is not unknow 
+	// Source_id is only injected when we are sure that memory value is not unknow
 
 	if((s_source_id[i] != c_source_id[i]) && (s_source_id[i] != o_source_id[i])){
         	if (ctx->debug)
              		fprintf (stderr, "Can't Inject source ID: %d s_source %d b_source %d not netflow v9 or source_id already used ? \n", i, s_source_id[i], c_source_id[i]);
 		lock = 1;
 		break;
-	} 
-	
+	}
+
         if (ctx->debug && i == 3 && !lock){
 		if (s_source_id[i] == 1){
              		fprintf (stderr, "Empty source ID is sending by template or oneaccess : Injection\n");
@@ -455,7 +460,6 @@ samplicate (ctx)
             }
           fprintf (stderr, "received %d bytes from %s:%s\n", n, host, serv);
         }
-
     for (sctx = ctx->sources; sctx != NULL; sctx = sctx->next)
 	{
 
@@ -466,55 +470,76 @@ samplicate (ctx)
 	      sctx->matched_packets += 1;
 	      sctx->matched_octets += n;
 
-	      for (i = 0; i < sctx->nreceivers; ++i)
-		{
-		  struct receiver *receiver = &(sctx->receivers[i]);
 
-		  if (receiver->freqcount == 0)
-		    {
-		      if (send_pdu_to_receiver (receiver, fpdu, n, (struct sockaddr *) &remote_address)
-			  == -1)
-			{
-			  receiver->out_errors += 1;
-			  if (getnameinfo ((struct sockaddr *) &receiver->addr,
-					   receiver->addrlen,
-					   host, INET6_ADDRSTRLEN,
-					   serv, 6,
-					   NI_NUMERICHOST|NI_NUMERICSERV)
-			      == -1)
-			    {
-			      strcpy (host, "???");
-			      strcpy (serv, "?????");
-			    }
-			  fprintf (stderr, "sending datagram to %s:%s failed: %s\n",
-				   host, serv, strerror (errno));
-			}
-		      else
-			{
-			  receiver->out_packets += 1;
-			  receiver->out_octets += n;
+        for (i = 0; i < sctx->nreceivers; ++i)
+            {
 
-			  if (ctx->debug)
-			    {
-			      if (getnameinfo ((struct sockaddr *) &receiver->addr,
-					       receiver->addrlen,
-					       host, INET6_ADDRSTRLEN,
-					       serv, 6,
-					       NI_NUMERICHOST|NI_NUMERICSERV)
-				  == -1)
-				{
-				  strcpy (host, "???");
-				  strcpy (serv, "?????");
-				}
-			      fprintf (stderr, "  sent to %s:%s\n", host, serv);
-			    }
-			}
-		      receiver->freqcount = receiver->freq-1;
+              if (ctx->loadb > 0)
+                maxre = ctx->receivermax;
+
+              if (ctx->loadb == 1)
+                {
+                  srand(time(0));
+                  randomlb = rand()%maxre;
+                }
+
+              struct receiver *receiver = &(sctx->receivers[i]);
+              if (receiver->freqcount == 0)
+                {
+                    if ((ctx->loadb == 0 || (ctx->loadb == 1 && randomlb == loopcount)) || (ctx->loadb == 2) && (inc == loopcount))
+                          if (send_pdu_to_receiver (receiver, fpdu, n, (struct sockaddr *) &remote_address) == -1)
+                            {
+                              receiver->out_errors += 1;
+                              if (getnameinfo ((struct sockaddr *) &receiver->addr,
+                                       receiver->addrlen,
+                                       host, INET6_ADDRSTRLEN,
+                                       serv, 6,
+                                       NI_NUMERICHOST|NI_NUMERICSERV)
+                                  == -1)
+                                {
+                                  strcpy (host, "???");
+                                  strcpy (serv, "?????");
+                                }
+                              fprintf (stderr, "sending datagram to %s:%s failed: %s\n",
+                                   host, serv, strerror (errno));
+                            }
+                              else
+                            {
+                              receiver->out_packets += 1;
+                              receiver->out_octets += n;
+                              if (ctx->debug)
+                                {
+                                  if (getnameinfo ((struct sockaddr *) &receiver->addr,
+                                           receiver->addrlen,
+                                           host, INET6_ADDRSTRLEN,
+                                           serv, 6,
+                                           NI_NUMERICHOST|NI_NUMERICSERV)
+                                  == -1)
+                                {
+                                  strcpy (host, "???");
+                                  strcpy (serv, "?????");
+                                }
+                                if (ctx->debug){
+                                    if (ctx->loadb > 0)
+                                       {
+                                         fprintf (stderr, "  sent to %s:%s\n", host, serv);
+                                         if (ctx->loadb == 1)
+                                            fprintf (stderr, "  load balance to %s:%s send to random %d max: %d \n", host, serv, randomlb+1, maxre);
+                                         if (ctx->loadb == 2)
+                                            fprintf (stderr, "  load balance to %s:%s max: %d \n", host, serv, maxre);
+                                       } else {
+                                         fprintf (stderr, "  sent to %s:%s\n", host, serv);
+                                       }
+                                }
+                              }
+                            }
+                  receiver->freqcount = receiver->freq-1;
 		    }
 		  else
 		    {
 		      receiver->freqcount -= 1;
 		    }
+          loopcount++;
 		  if (sctx->tx_delay)
 		    usleep (sctx->tx_delay);
 		}
@@ -522,31 +547,43 @@ samplicate (ctx)
 	  else
 	    {
 	      if (ctx->debug)
-		{
-		  if (getnameinfo ((struct sockaddr *) &sctx->source,
-				   sctx->addrlen,
-				   host, INET6_ADDRSTRLEN,
-				   0, 0,
-				   NI_NUMERICHOST|NI_NUMERICSERV)
-		      == -1)
-		    {
-		      strcpy (host, "???");
-		    }
-		  fprintf (stderr, "Not matching %s/", host);
-		  if (getnameinfo ((struct sockaddr *) &sctx->mask,
-				   sctx->addrlen,
-				   host, INET6_ADDRSTRLEN,
-				   0, 0,
-				   NI_NUMERICHOST|NI_NUMERICSERV)
-		      == -1)
-		    {
-		      strcpy (host, "???");
-		    }
-		  fprintf (stderr, "%s\n", host);
-		}
+            {
+              if (getnameinfo ((struct sockaddr *) &sctx->source,
+                       sctx->addrlen,
+                       host, INET6_ADDRSTRLEN,
+                       0, 0,
+                       NI_NUMERICHOST|NI_NUMERICSERV)
+                  == -1)
+                {
+                  strcpy (host, "???");
+                }
+              fprintf (stderr, "Not matching %s/", host);
+              if (getnameinfo ((struct sockaddr *) &sctx->mask,
+                       sctx->addrlen,
+                       host, INET6_ADDRSTRLEN,
+                       0, 0,
+                       NI_NUMERICHOST|NI_NUMERICSERV)
+                  == -1)
+                {
+                  strcpy (host, "???");
+                }
+              fprintf (stderr, "%s\n", host);
+            }
 	    }
+// End of for
 	}
+	if (ctx->loadb == 2)
+	 {
+      if (inc < maxre)
+      {
+         inc++;
+       } else {
+         inc=0;
+       }
+     }
+// End of while
     }
+
 }
 
 static int
