@@ -326,6 +326,8 @@ samplicate (ctx)
   socklen_t addrlen;
   char host[INET6_ADDRSTRLEN];
   char serv[6];
+  char dsthost[INET6_ADDRSTRLEN];
+  char dstserv[6];
   char buffer[10];
   int port;
   char *adrIPp;
@@ -364,10 +366,10 @@ samplicate (ctx)
 	  exit (1);
 	}
 
-    if (ctx->debug){
+    if (ctx->debug > 1){
             int rc = getnameinfo((struct sockaddr *)&remote_address, addrlen, host, INET6_ADDRSTRLEN,
 			   serv, 6,NI_NUMERICHOST | NI_NUMERICSERV);
-        if (rc == 0) printf("New connection from %s \n", host);
+        if (rc == 0) printf("New connection from %s:%s \n", host, serv);
 
     }
 
@@ -382,7 +384,7 @@ samplicate (ctx)
         inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
 
         adrIPp =(char *)inet_ntoa(s->sin_addr);
-        if (ctx->debug)
+        if (ctx->debug > 1)
             printf("IP address: %x, is %s %x \n", htonl(s->sin_addr.s_addr), adrIPp, s->sin_addr.s_addr);
     } else { // AF_INET6
         struct sockaddr_in6 *s = (struct sockaddr_in6 *)&remote_address;
@@ -405,32 +407,31 @@ samplicate (ctx)
     //
     for (int i = 16; i <= 19; i++){
         s_source_id[a] = fpdu[i];
-        if (ctx->debug)
+        if (ctx->debug > 1)
             fprintf (stderr, "Copy source_id memory value source data %d \n" ,fpdu[i]);
         a++;
     }
 
-
     for (int i = 0; i <= 3; i++){
-       	if (ctx->debug)
+       	if (ctx->debug > 1)
            	fprintf (stderr, "Compare source number ID: %d s_source %d c_source %d or o_source %d \n", i, s_source_id[i], c_source_id[i], o_source_id[i]);
-	// when a template is sending value number 5 can be 0 not 1
-	// Source_id is only injected when we are sure that memory value is not unknow
+        // when a template is sending value number 5 can be 0 not 1
+        // Source_id is only injected when we are sure that memory value is not unknow
 
-	if((s_source_id[i] != c_source_id[i]) && (s_source_id[i] != o_source_id[i])){
-        	if (ctx->debug)
-             		fprintf (stderr, "Can't Inject source ID: %d s_source %d b_source %d not netflow v9 or source_id already used ? \n", i, s_source_id[i], c_source_id[i]);
-		lock = 1;
-		break;
-	}
+        if((s_source_id[i] != c_source_id[i]) && (s_source_id[i] != o_source_id[i])){
+                if (ctx->debug > 1)
+                        fprintf (stderr, "Can't Inject source ID: %d s_source %d b_source %d not netflow v9 or source_id already used ? \n", i, s_source_id[i], c_source_id[i]);
+            lock = 1;
+            break;
+        }
 
-        if (ctx->debug && i == 3 && !lock){
-		if (s_source_id[i] == 1){
-             		fprintf (stderr, "Empty source ID is sending by template or oneaccess : Injection\n");
-		}
-		if (s_source_id[i] == 0){
-             		fprintf (stderr, "Empty source ID is sending by cisco: Injection\n");
-		}
+        if (ctx->debug > 1 && i == 3 && !lock){
+            if (s_source_id[i] == 1){
+                        fprintf (stderr, "Empty source ID is sending by template or oneaccess : Injection\n");
+            }
+            if (s_source_id[i] == 0){
+                        fprintf (stderr, "Empty source ID is sending by cisco: Injection\n");
+            }
     	}
     }
 
@@ -511,24 +512,23 @@ samplicate (ctx)
                                 {
                                   if (getnameinfo ((struct sockaddr *) &receiver->addr,
                                            receiver->addrlen,
-                                           host, INET6_ADDRSTRLEN,
-                                           serv, 6,
+                                           dsthost, INET6_ADDRSTRLEN,
+                                           dstserv, 6,
                                            NI_NUMERICHOST|NI_NUMERICSERV)
                                   == -1)
                                 {
-                                  strcpy (host, "???");
-                                  strcpy (serv, "?????");
+                                  strcpy (dsthost, "???");
+                                  strcpy (dstserv, "?????");
                                 }
                                 if (ctx->debug){
                                     if (ctx->loadb > 0)
                                        {
-                                         fprintf (stderr, "  sent to %s:%s\n", host, serv);
                                          if (ctx->loadb == 1)
-                                            fprintf (stderr, "  load balance to %s:%s send to random %d max: %d \n", host, serv, randomlb+1, maxre);
+                                            fprintf (stderr, "Source: %s:%s load balance to %s:%s sent %d bytes to random %d max: %d \n", host, serv, dsthost, dstserv, n, randomlb+1, maxre);
                                          if (ctx->loadb == 2)
-                                            fprintf (stderr, "  load balance to %s:%s max: %d \n", host, serv, maxre);
+                                            fprintf (stderr, "Source: %s:%s load balance to %s:%s sent %d bytes max: %d \n", host, serv, dsthost, dstserv, n, maxre);
                                        } else {
-                                         fprintf (stderr, "  sent to %s:%s\n", host, serv);
+                                         fprintf (stderr, "Source: %s:%s sent %d bytes to %s:%s\n", host, serv, n, dsthost, dstserv);
                                        }
                                 }
                               }
