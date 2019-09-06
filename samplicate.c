@@ -474,7 +474,6 @@ samplicate (ctx)
 
         for (i = 0; i < sctx->nreceivers; ++i)
             {
-
               if (ctx->loadb > 0)
                 maxre = ctx->receivermax;
 
@@ -528,21 +527,20 @@ samplicate (ctx)
                                          if (ctx->loadb == 2)
                                             fprintf (stderr, "Source: %s:%s load balance to %s:%s sent %d bytes max: %d \n", host, serv, dsthost, dstserv, n, maxre);
                                        } else {
-                                         fprintf (stderr, "Source: %s:%s sent %d bytes to %s:%s\n", host, serv, n, dsthost, dstserv);
+                                            fprintf (stderr, "Source: %s:%s sent %d bytes to %s:%s\n", host, serv, n, dsthost, dstserv);
                                        }
                                 }
                               }
                             }
-                  receiver->freqcount = receiver->freq-1;
-		    }
-		  else
-		    {
-		      receiver->freqcount -= 1;
-		    }
-          loopcount++;
+                    receiver->freqcount = receiver->freq-1;
+                }
+              else
+                {
+                  receiver->freqcount -= 1;
+                }
 		  if (sctx->tx_delay)
 		    usleep (sctx->tx_delay);
-		}
+            }
 	    }
 	  else
 	    {
@@ -569,20 +567,21 @@ samplicate (ctx)
                 }
               fprintf (stderr, "%s\n", host);
             }
+// End of first for
 	    }
-// End of for
+// End of second for
+        loopcount++;
 	}
-	if (ctx->loadb == 2)
-	 {
-      if (inc < maxre)
+    if ((ctx->loadb == 2) && (inc == maxre-1))
       {
-         inc++;
-       } else {
-         inc=0;
-       }
-     }
+        inc = 0;
+        loopcount = 0;
+      } else {
+        inc++;
+      }
+
 // End of while
-    }
+  }
 
 }
 
