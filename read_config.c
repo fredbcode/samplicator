@@ -902,6 +902,9 @@ Supported options:\n\
   -s <address>             Interface address to accept flows on (default any)\n\
   -d <level>               debug level\n\
   -l <1 - 2>	    	   load balance requests (1 Random - more cpu usage - 2 round robin, config file only)\n\
+			   Round robin - each packet is pushed line by line to destination (line 1, line 2, line 3, etc)\n\
+		           load balancing - each line is pushed randomly to destination (line 5, line 1, line 4, etc)\n\
+ 			   Default each packet is cheched to all destinations\n\
   -t <timeout_ms>          Exit with RC 5 if no data is received for this\n\
                            amount of milliseconds\n\
   -b <size>                set socket buffer size (default %lu)\n\
