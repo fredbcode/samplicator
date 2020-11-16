@@ -25,6 +25,7 @@ struct samplicator_context {
   long				pdulen;
   int				debug;
   int				loadb;
+  int				source_id;
   int				timeout;
   int				fork;
   int				ipv4_only;

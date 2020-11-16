@@ -17,6 +17,7 @@ This distribution uses GNU configure for portability and flexibility
 of installation.  You must configure the program for your system
 before you can compile it using make:
 
+	$ ./autogen.sh
 	$ ./configure
 	$ make
 

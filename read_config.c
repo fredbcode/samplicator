@@ -791,6 +791,7 @@ parse_args (argc, argv, ctx)
   ctx->sources = 0;
   ctx->default_receiver_flags = pf_CHECKSUM;
   ctx->loadb = 0;
+  ctx->source_id = 0;
   ctx->spoofed_src_addr = NULL;
 
   /* assume that command-line supplied receivers want to get all data */
@@ -826,7 +827,7 @@ parse_args (argc, argv, ctx)
 	case 'm': /* make PID file */
 	  ctx->pid_file = optarg;
 	  break;
-    case 'l': /* loadbalance */
+    	case 'l': /* loadbalance */
 	  ctx->loadb = atoi (optarg);
 	  break;
 	case 's': /* flow address */
@@ -835,18 +836,21 @@ parse_args (argc, argv, ctx)
 	case 'x': /* transmit delay */
 	  sctx->tx_delay = atoi (optarg);
 	  break;
-  case 'P':
-    ctx->default_receiver_flags |= pf_SPOOF_WITH_IP;
-    ctx->spoofed_src_addr = optarg;
-    break;
-	case 'S': /* spoof */
-    ctx->default_receiver_flags |= pf_SPOOF;
-    break;
+  	case 'P':
+   	  ctx->default_receiver_flags |= pf_SPOOF_WITH_IP;
+	  ctx->spoofed_src_addr = optarg;
+   	  break;
+        case 'S': /* spoof */
+    	  ctx->default_receiver_flags |= pf_SPOOF;
+    	  break;
 	case 'c': /* config file */
 	  if (read_cf_file (optarg, ctx) != 0)
 	    {
 	      return -1;
 	    }
+	  break;
+	case 'i': /* Add source_id field experimental */
+	  ctx->source_id = 1;
 	  break;
 	case 'f': /* fork */
 	  ctx->fork = 1;
@@ -911,7 +915,10 @@ Supported options:\n\
   -4                       IPv4 only\n\
   -6                       IPv6 only\n\
   -h                       print this usage message and exit\n\
+  -i			   add a value to source_id field (if inexistant) // experimental //\n\
   -u <pdulen>              size of max pdu on listened socket (default 65536)\n\
+\n\
+// EXPERIMENTAL VERSION github fredbcode //\n\
 \n\
 Specifying receivers:\n\
 \n\

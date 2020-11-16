@@ -398,45 +398,48 @@ samplicate (ctx)
     strcpy(src,buffer);
 
     int lock = 0;
-    int a = 0;
     int randomlb = 0;
     int maxre;
     int intermediate = 0;
     int loopcount = 0;
     // Take the source_id in memory
     //
-    for (int i = 16; i <= 19; i++){
-        s_source_id[a] = fpdu[i];
-        if (ctx->debug > 1)
-            fprintf (stderr, "Copy source_id memory value source data %d \n" ,fpdu[i]);
-        a++;
+ 
+    if (ctx->source_id != 0) {
+           int a = 0;
+	   for (int i = 16; i <= 19; i++){
+		s_source_id[a] = fpdu[i];
+		if (ctx->debug > 1)
+		    fprintf (stderr, "Copy source_id memory value source data %d \n" ,fpdu[i]);
+		a++;
+	    }
+
+	    for (int i = 0; i <= 3; i++){
+	       	if (ctx->debug > 1)
+		   	fprintf (stderr, "Compare source number ID: %d s_source %d c_source %d or o_source %d \n", i, s_source_id[i], c_source_id[i], o_source_id[i]);
+		// when a template is sending value number 5 can be 0 not 1
+		// Source_id is only injected when we are sure that memory value is not unknow
+
+		if((s_source_id[i] != c_source_id[i]) && (s_source_id[i] != o_source_id[i])){
+		        if (ctx->debug > 1)
+		                fprintf (stderr, "Can't Inject source ID: %d s_source %d b_source %d not netflow v9 or source_id already used ? \n", i, s_source_id[i], c_source_id[i]);
+		    lock = 1;
+		    break;
+		}
+
+		if (ctx->debug > 1 && i == 3 && !lock){
+		    if (s_source_id[i] == 1){
+		                fprintf (stderr, "Empty source ID is sending by template or oneaccess : Injection\n");
+		    }
+		    if (s_source_id[i] == 0){
+		                fprintf (stderr, "Empty source ID is sending by cisco: Injection\n");
+		    }
+	    	}
+	    }
+
+	    if (!lock)
+		memcpy(fpdu+15, src, sizearray);
     }
-
-    for (int i = 0; i <= 3; i++){
-       	if (ctx->debug > 1)
-           	fprintf (stderr, "Compare source number ID: %d s_source %d c_source %d or o_source %d \n", i, s_source_id[i], c_source_id[i], o_source_id[i]);
-        // when a template is sending value number 5 can be 0 not 1
-        // Source_id is only injected when we are sure that memory value is not unknow
-
-        if((s_source_id[i] != c_source_id[i]) && (s_source_id[i] != o_source_id[i])){
-                if (ctx->debug > 1)
-                        fprintf (stderr, "Can't Inject source ID: %d s_source %d b_source %d not netflow v9 or source_id already used ? \n", i, s_source_id[i], c_source_id[i]);
-            lock = 1;
-            break;
-        }
-
-        if (ctx->debug > 1 && i == 3 && !lock){
-            if (s_source_id[i] == 1){
-                        fprintf (stderr, "Empty source ID is sending by template or oneaccess : Injection\n");
-            }
-            if (s_source_id[i] == 0){
-                        fprintf (stderr, "Empty source ID is sending by cisco: Injection\n");
-            }
-    	}
-    }
-
-    if (!lock)
-        memcpy(fpdu+15, src, sizearray);
 
     if (n > ctx->pdulen)
 	{
